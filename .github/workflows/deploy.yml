@@ -4,10 +4,8 @@ on:
   push:
     branches:
       - main
-  # Allow manual re-deploys from the Actions tab
   workflow_dispatch:
 
-# Grant the workflow permission to write to the gh-pages branch
 permissions:
   contents: write
 
@@ -38,25 +36,28 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Build is already done; dist/ is at weather-radar-app/dist
-
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-
-          # Fetch gh-pages branch from origin and switch to it
+          
+          # Copy dist files FIRST (before switching branches, while they exist on main)
+          cp -r weather-radar-app/dist /tmp/dist_build
+          
+          # Fetch and checkout gh-pages branch
           git fetch origin gh-pages:gh-pages 2>/dev/null || true
           git checkout gh-pages || git checkout --orphan gh-pages
-
-          # Remove all existing files except .git
-          find . -mindepth 1 -not -path './.git' -not -path './.git/*' -delete
-
+          
+          # Remove all old files except .git
+          ls -A | grep -v "^\.git$" | xargs rm -rf
+          
           # Copy dist files to repo root
-          cp -r weather-radar-app/dist/* .
-
-          # Create .nojekyll to prevent Jekyll processing
+          cp -r /tmp/dist_build/* .
+          
+          # Create .nojekyll
           touch .nojekyll
-
+          
           # Commit and push
           git add -A
           if ! git diff-index --quiet HEAD --; then
             git commit -m "Deploy: $(git rev-parse --short origin/main)"
+            git push -u origin gh-pages --force
+          fi
