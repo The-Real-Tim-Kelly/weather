@@ -38,25 +38,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd weather-radar-app
+          # Build is already done; dist/ is at weather-radar-app/dist
+          
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           
-          # Create gh-pages branch if it doesn't exist and switch to it
-          if git rev-parse --verify gh-pages >/dev/null 2>&1; then
-            git checkout gh-pages
-          else
-            git checkout --orphan gh-pages
-          fi
+          # Fetch gh-pages branch from origin and switch to it
+          git fetch origin gh-pages:gh-pages 2>/dev/null || true
+          git checkout gh-pages || git checkout --orphan gh-pages
           
-          # Copy dist files to root and commit
-          cp -r dist/* .
+          # Remove all existing files except .git
+          find . -mindepth 1 -not -path './.git/*' -delete
+          
+          # Copy dist files to repo root
+          cp -r weather-radar-app/dist/* .
+          
+          # Create .nojekyll to prevent Jekyll processing
+          touch .nojekyll
+          
+          # Commit and push
           git add -A
-          
-          # Only commit if there are changes
           if ! git diff-index --quiet HEAD --; then
-            git commit -m "Deploy from main: $(git rev-parse --short origin/main)"
-            git push -u origin gh-pages --force
-          else
-            echo "No changes to deploy"
-          fi
+            git commit -m "Deploy: $(git rev-parse --short origin/main)"
