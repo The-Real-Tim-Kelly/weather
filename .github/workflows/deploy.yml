@@ -7,12 +7,18 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,32 +38,21 @@ jobs:
         working-directory: weather-radar-app
         run: npm run build
 
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: weather-radar-app/dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
       - name: Deploy to GitHub Pages
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-          
-          # Copy dist files FIRST (before switching branches, while they exist on main)
-          cp -r weather-radar-app/dist /tmp/dist_build
-          
-          # Fetch and checkout gh-pages branch
-          git fetch origin gh-pages:gh-pages 2>/dev/null || true
-          git checkout gh-pages || git checkout --orphan gh-pages
-          
-          # Remove all old files except .git
-          ls -A | grep -v "^\.git$" | xargs rm -rf
-          
-          # Copy dist files to repo root
-          cp -r /tmp/dist_build/* .
-          
-          # Create .nojekyll
-          touch .nojekyll
-          
-          # Commit and push
-          git add -A
-          if ! git diff-index --quiet HEAD --; then
-            git commit -m "Deploy: $(git rev-parse --short origin/main)"
-            git push -u origin gh-pages --force
-          fi
+        id: deployment
+        uses: actions/deploy-pages@v4
