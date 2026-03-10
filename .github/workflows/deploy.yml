@@ -35,11 +35,28 @@ jobs:
         run: npm run build
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./weather-radar-app/dist
-          # Keep the gh-pages branch clean on every deploy
-          force_orphan: true
-          # Ensure single-page app routing works by adding a 404.html fallback
-          enable_jekyll: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd weather-radar-app
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          
+          # Create gh-pages branch if it doesn't exist and switch to it
+          if git rev-parse --verify gh-pages >/dev/null 2>&1; then
+            git checkout gh-pages
+          else
+            git checkout --orphan gh-pages
+          fi
+          
+          # Copy dist files to root and commit
+          cp -r dist/* .
+          git add -A
+          
+          # Only commit if there are changes
+          if ! git diff-index --quiet HEAD --; then
+            git commit -m "Deploy from main: $(git rev-parse --short origin/main)"
+            git push -u origin gh-pages --force
+          else
+            echo "No changes to deploy"
+          fi
